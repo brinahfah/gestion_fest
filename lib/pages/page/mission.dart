@@ -15,6 +15,8 @@ class _MissionsSectionState extends State<MissionsSection> {
 
   Map<String, TextEditingController> controllers = {};
 
+  Map<String, DateTime?> dates = {};
+
   @override
   void dispose() {
     for (var c in controllers.values) {
@@ -26,13 +28,13 @@ class _MissionsSectionState extends State<MissionsSection> {
   Color getStatutColor(String statut) {
     switch (statut) {
       case "Complété":
-        return Colors.green.shade800;
+        return Colors.green.shade900;
       case "En retard":
-        return Colors.red;
+        return Colors.red.shade800;
       case "En cours":
-        return Colors.green.shade400;
+        return Colors.green.shade500;
       default:
-        return Colors.yellow;
+        return Colors.yellow.shade500;
     }
   }
 
@@ -51,10 +53,9 @@ class _MissionsSectionState extends State<MissionsSection> {
     return "À faire";
   }
 
-  Future<void> updateMission(
-      String docId, String commentaire, DateTime? dateEffectuee) async {
+  Future<void> updateMission(String docId, String commentaire, DateTime? dateEffectuee) async {
+    print("Date envoyée : $dateEffectuee");
     String statut = computeStatut(dateEffectuee, commentaire);
-
     await missionsRef.doc(docId).update({
       "commentaire": commentaire,
       "dateEffectuee": dateEffectuee,
@@ -62,27 +63,12 @@ class _MissionsSectionState extends State<MissionsSection> {
     });
   }
 
-  Future<void> deleteMission(
-      String docId, String commentaire, DateTime? dateEffectuee) async {
-    final confirm = await showDialog<bool>(
-      context: context,
-      builder: (dialogContext) => AlertDialog(
-        title: const Text("Confirmer la suppression"),
-        content: const Text("Voulez-vous vraiment supprimer cette mission ?"),
-        actions: [
-          TextButton(
-              onPressed: () => Navigator.pop(dialogContext, false),
-              child: const Text("Annuler")),
-          TextButton(
-              onPressed: () => Navigator.pop(dialogContext, true),
-              child: const Text("Supprimer")),
-        ],
-      ),
-    );
-
-    if (confirm == true) {
-      await updateMission(docId, commentaire, null);
-    }
+  Future<void> deleteMission(String docId) async {
+    await missionsRef.doc(docId).update({
+      "dateEffectuee": null,
+      "commentaire": "",
+      "statut": "À faire",
+    });
   }
 
   @override
@@ -96,24 +82,30 @@ class _MissionsSectionState extends State<MissionsSection> {
 
         final missions = snapshot.data!.docs;
 
-        return Expanded(
-          child: ListView.builder(
+        if (missions.isEmpty) {
+          return const Center(child: Text("Aucune mission", style: TextStyle(color: Colors.black)));
+        }
+
+        return ListView.builder(
             itemCount: missions.length,
             itemBuilder: (context, index) {
               final doc = missions[index];
-              final data = doc.data() as Map<String, dynamic>;
+              final data = doc.data() as Map<String, dynamic>? ?? {};
 
               if (!controllers.containsKey(doc.id)) {
-                controllers[doc.id] =
-                    TextEditingController(text: data['commentaire'] ?? "");
+                controllers[doc.id] = TextEditingController(text: data['commentaire'] ?? "");
               }
-
               final controller = controllers[doc.id]!;
 
-              DateTime? dateEffectuee = data['dateEffectuee'] != null
+              final firestoreDate = data['dateEffectuee'] != null
                   ? (data['dateEffectuee'] as Timestamp).toDate()
                   : null;
 
+              if (!dates.containsKey(doc.id)) {
+                dates[doc.id] = firestoreDate;
+              }
+
+              DateTime? dateEffectuee = dates[doc.id];
               String statut = computeStatut(dateEffectuee, controller.text);
 
               return Card(
@@ -123,20 +115,16 @@ class _MissionsSectionState extends State<MissionsSection> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text("Mission ${data['numero']}"),
+                      Text("Mission ${data['numero'] ?? 'N/A'}"),
                       Text("Statut: $statut"),
-
                       const SizedBox(height: 8),
-
                       TextField(
                         controller: controller,
                         decoration: const InputDecoration(
                           labelText: "Commentaire",
                         ),
                       ),
-
                       const SizedBox(height: 8),
-
                       Row(
                         children: [
                           Expanded(
@@ -146,16 +134,15 @@ class _MissionsSectionState extends State<MissionsSection> {
                                 border: Border.all(color: Colors.grey),
                                 borderRadius: BorderRadius.circular(8),
                               ),
-                              child: Text(
-                                dateEffectuee != null
-                                    ? "${dateEffectuee.year}-${dateEffectuee.month}-${dateEffectuee.day}"
-                                    : "Aucune date",
-                              ),
+                              child: Text(dateEffectuee != null
+                                  ? "${dateEffectuee.year}-${dateEffectuee.month}-${dateEffectuee.day}"
+                                  : "Aucune date"),
                             ),
                           ),
-
-                          TextButton(
+                          IconButton(
+                            icon: const Icon(Icons.calendar_today),
                             onPressed: () async {
+                              print("Calendrier ouvert");
                               DateTime? picked = await showDatePicker(
                                 context: context,
                                 initialDate: dateEffectuee ?? DateTime.now(),
@@ -163,30 +150,27 @@ class _MissionsSectionState extends State<MissionsSection> {
                                 lastDate: DateTime(2100),
                               );
 
+                              print("Date choisie : $picked");
+
                               if (picked != null) {
                                 setState(() {
-                                  dateEffectuee = picked;
+                                  dates[doc.id] = picked;
                                 });
-
-                                await updateMission(
-                                    doc.id, controller.text, dateEffectuee);
                               }
                             },
-                            child: const Text("📅", style: TextStyle(fontSize: 24)),
                           ),
-
-                          TextButton(
+                          IconButton(
+                            icon: const Icon(Icons.delete),
                             onPressed: () async {
-                              await deleteMission(doc.id, controller.text, dateEffectuee);
+                              await deleteMission(doc.id);
+                              setState(() {
+                                dates.remove(doc.id);
+                              });
                             },
-                            child: const Text("🗑️", style: TextStyle(fontSize: 24)),
                           ),
                         ],
                       ),
-
                       const SizedBox(height: 10),
-
-                      // ✅ BOUTON ENREGISTRER AJOUTÉ
                       SizedBox(
                         width: double.infinity,
                         child: ElevatedButton(
@@ -194,9 +178,8 @@ class _MissionsSectionState extends State<MissionsSection> {
                             await updateMission(
                               doc.id,
                               controller.text,
-                              dateEffectuee,
+                              dates[doc.id],
                             );
-
                             ScaffoldMessenger.of(context).showSnackBar(
                               const SnackBar(content: Text("Mission enregistrée ✅")),
                             );
@@ -209,7 +192,6 @@ class _MissionsSectionState extends State<MissionsSection> {
                 ),
               );
             },
-          ),
         );
       },
     );
