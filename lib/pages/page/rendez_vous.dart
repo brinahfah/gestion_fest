@@ -36,13 +36,13 @@ class _RendezVousSectionState extends State<RendezVousSection> {
     }
   }
 
-  String computeStatut(DateTime? date, String commentaire) {
+  String computeStatut(DateTime? dateEffectuee, String commentaire) {
     final now = DateTime.now();
     final today = DateTime(now.year, now.month, now.day);
 
-    if (date == null) return " faire";
+    if (dateEffectuee == null) return " faire";
 
-    final d = DateTime(date.year, date.month, date.day);
+    final d = DateTime(dateEffectuee.year, dateEffectuee.month, dateEffectuee.day);
 
     if (d.isAfter(today)) return "En retard";
     if (d.isAtSameMomentAs(today)) return "En cours";
@@ -89,111 +89,110 @@ class _RendezVousSectionState extends State<RendezVousSection> {
         }
 
         return ListView.builder(
-            itemCount: rdvs.length,
-            itemBuilder: (context, index) {
-              final doc = rdvs[index];
-              final data = doc.data() as Map<String, dynamic>? ?? {};
+          itemCount: rdvs.length,
+          itemBuilder: (context, index) {
+            final doc = rdvs[index];
+            final data = doc.data() as Map<String, dynamic>? ?? {};
 
-              if (!controllers.containsKey(doc.id)) {
-                controllers[doc.id] = TextEditingController(text: data['commentaire'] ?? "");
-              }
-              final controller = controllers[doc.id]!;
+            if (!controllers.containsKey(doc.id)) {
+              controllers[doc.id] = TextEditingController(text: data['commentaire'] ?? "");
+            }
+            final controller = controllers[doc.id]!;
 
-              final firestoreDate = data['date'] != null
-                  ? (data['date'] as Timestamp).toDate()
-                  : null;
+            final firestoreDate = data['date'] != null
+                ? (data['date'] as Timestamp).toDate()
+                : null;
 
-              if (!dates.containsKey(doc.id)) {
-                dates[doc.id] = firestoreDate;
-              }
-              DateTime? date = dates[doc.id];
-              String statut = computeStatut(date, controller.text);
+            if (!dates.containsKey(doc.id)) {
+              dates[doc.id] = firestoreDate;
+            }
+            DateTime? date = dates[doc.id];
+            String statut = computeStatut(date, controller.text);
 
-              return Card(
-                color: getStatutColor(statut),
-                child: Padding(
-                  padding: const EdgeInsets.all(12),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text("Rendez-vous ${data['numero'] ?? 'N/A'} - ${data['theme'] ?? 'N/A'}"),
-                      Text("Statut: $statut"),
-                      const SizedBox(height: 8),
-                      TextField(
-                        controller: controller,
-                        decoration: const InputDecoration(
-                          labelText: "Commentaire",
-                        ),
+            return Card(
+              color: getStatutColor(statut),
+              child: Padding(
+                padding: const EdgeInsets.all(12),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text("Rendez-vous ${data['numero'] ?? 'N/A'} - ${data['theme'] ?? 'N/A'}"),
+                    Text("Statut: $statut"),
+                    const SizedBox(height: 8),
+                    TextField(
+                      controller: controller,
+                      decoration: const InputDecoration(
+                        labelText: "Commentaire",
                       ),
-                      const SizedBox(height: 8),
-                      Row(
-                        children: [
-                          Expanded(
-                            child: Container(
-                              padding: const EdgeInsets.all(12),
-                              decoration: BoxDecoration(
-                                border: Border.all(color: Colors.grey),
-                                borderRadius: BorderRadius.circular(8),
-                              ),
-                              child: Text(
-                                  date != null ? "${date.year}-${date.month}-${date.day}" : "Aucune date"),
+                    ),
+                    const SizedBox(height: 8),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Container(
+                            padding: const EdgeInsets.all(12),
+                            decoration: BoxDecoration(
+                              border: Border.all(color: Colors.grey),
+                              borderRadius: BorderRadius.circular(8),
                             ),
+                            child: Text(
+                                date != null ? "${date.year}-${date.month}-${date.day}" : "Aucune date"),
                           ),
-                          IconButton(
-                            icon: const Icon(Icons.calendar_today),
-                            onPressed: () async {
-                              print("Calendrier ouvert");
-                              DateTime? picked = await showDatePicker(
-                                context: context,
-                                initialDate: date ?? DateTime.now(),
-                                firstDate: DateTime(2020),
-                                lastDate: DateTime(2100),
-                              );
-                              print("Date choisie : $picked");
-                              if (picked != null) {
-                                setState(() {
-                                  dates[doc.id] = picked;
-                                });
-                              }
-                            },
-                          ),
-                          IconButton(
-                            icon: const Icon(Icons.delete),
-                            onPressed: () async {
-                              await deleteRdv(doc.id);
-                              setState(() {
-                                dates.remove(doc.id);
-                                dates[doc.id] = null;
-                                controllers[doc.id]?.clear();
-                              });
-                            },
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 10),
-                      SizedBox(
-                        width: double.infinity,
-                        child: ElevatedButton(
-                          onPressed: () async {
-                            await updateRdv(
-                              doc.id,
-                              controller.text,
-                              dates[doc.id],
-                            );
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(content: Text("Rendez-vous enregistré ✅")),
-                            );
-                          },
-                          child: const Text("Enregistrer"),
                         ),
+                        IconButton(
+                          icon: const Icon(Icons.calendar_today),
+                          onPressed: () async {
+                            print("Calendrier ouvert");
+                            DateTime? picked = await showDatePicker(
+                              context: context,
+                              initialDate: date ?? DateTime.now(),
+                              firstDate: DateTime(2020),
+                              lastDate: DateTime(2100),
+                            );
+                            print("Date choisie : $picked");
+                            if (picked != null) {
+                              setState(() {
+                                dates[doc.id] = picked;
+                              });
+                            }
+                          },
+                        ),
+                        IconButton(icon: const Icon(Icons.delete),
+                          onPressed: () async {
+                            await deleteRdv(doc.id);
+                            setState(() {
+                              dates[doc.id] = null;
+                              controllers[doc.id]?.clear();
+                            });
+                          },
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 10),
+                    SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton(
+                        onPressed: () async {
+                          await updateRdv(
+                            doc.id,
+                            controller.text,
+                            dates[doc.id],
+                          );
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(content: Text("Rendez-vous enregistré ✅")),
+                          );
+                        },
+                        child: const Text("Enregistrer"),
                       ),
-                    ],
-                  ),
+                    ),
+                  ],
                 ),
-              );
-            },
+              ),
+            );
+          },
         );
       },
     );
   }
 }
+
